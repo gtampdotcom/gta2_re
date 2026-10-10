@@ -282,3 +282,18 @@ temp after it.
   worse (4 -> 44 and 4 -> ~70 lines).
 - The near misses that read as register swaps in `docs/match_attempts.md` are worth a `ralog.sh`
   run each: equal priorities point at statement order, a nonzero score at a preference.
+- **Commutative operand order (`Car_6C::SpawnCarOnRoadNetwork_4458B0`, one `lea` off).** The original has
+  `lea edx,[eax+ecx]` for `ground_z + kFP16One_6777D0` (local first), ours `[ecx+eax]`. With `opdump.py`
+  (all boundaries) the add (IL op `0x16D`, `0x16E` is sub) still has the source order `(ground_z, kFP16One)` at
+  boundary `107659c0` and is `(kFP16One, ground_z)` from `107659dc` on, so the swap is done by `0x1070A82D` or
+  `0x1070A8C2` (the two calls between those boundaries in `0x107657E2`). `0x1070A82D` walks the instructions and
+  rebuilds kind-12 ones as expression trees (`0x10706785` -> `0x10706B59` -> simplifiers `0x10706EE2`,
+  `0x10707C06`, `0x10707E41`, `0x10707BBC`, `0x10708B81`); the ordering rule is in there but not found yet.
+  What it is not: source operand order, statement or call order, temporaries, references or pointers to the
+  global, other uses of either symbol in the function, the function's position in the TU (all 247 placements),
+  the symbol records' heap addresses, the symbol kinds alone, or `[sym+0x30]`. Probes (local from a call, from a
+  field, a parameter, a global defined in the TU or `extern`, field stores or an inline setter, in a `switch`
+  or not) always give `(global, local)`. In real code some `(local, global)` adds keep their order, e.g.
+  `Car_BC::TrainUpdate_442D70` case 4 (`z + kCollisionPrismHalfHeight_6771E4`), but a probe copying that case
+  swaps, so the deciding input is outside the expression itself. `Char_B4::HandlePedCollision_548BD0`'s
+  `kAng180 + atan2(...)` load order may be the same question.
